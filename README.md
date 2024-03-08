@@ -5,7 +5,7 @@ This package provides an explainability tool to use in analysis of random forest
 The core functions provided are:
 - a data similarity score
 - a data extrapolation score
-- a data quantity score
+- a data observations score
 
 # Explanation
 
@@ -15,7 +15,7 @@ The data similarity score informs on how similar a data sample is to a reference
 
 The data extrapolation score informs on how much a data sample is extrapolating by tracking the distance to the decision bounds it encountered. We can also include the bounds of the training samples which also ended in the same leaves to further specify the extrapolation score. Unused features are ignored in the score.
 
-The data quantity score informs on how many training samples were used to train the leaves of the tree. There are two variations on this value. Because of various training strategies not all training samples need be consumed during training. We have two different strategies, 'seen' and 'reweighted', which count either only the samples that were used to train the leaf values, or the proportion of the total input data that was used.
+The data observations score informs on how many training samples were used to train the leaves of the tree. There are two variations on this value. Because of various training strategies not all training samples need be consumed during training. We have two different strategies, 'seen' and 'reweighted', which count either only the samples that were used to train the leaf values, or the proportion of the total input data that was used.
 
 All scores are first calculated on decision trees and then aggregated over the trees by calculating the weighted means. The weights of the mean are determined by the weights of the ensemble.
 
@@ -74,10 +74,15 @@ from ExplainableRandomForests.Forests.forests import SklearnRandomForestExplaine
 model_explainer = SklearnRandomForestExplainer(model)
 ```
 
-We can now compute the data similarity score. This is answering the question: Which points in X_test and X are similar to the last two points of X_test?
+#### Data similarity
+
+Computing the data similarity score answers the question: Which points in X_test and X are similar to the reference points?
+
+It arrives at this conclusion by looking at similarity on the model level. It looks at which leaves of the decision tree the sample points matches the reference points. The points are similar in the sense that it is the frequency with which the sample points get the same value assigned as the reference points.
 ```python
-print(similarity_test := model_explainer.data_similarity(X_test, X_test[-2:]))
-print(similarity_train := model_explainer.data_similarity(X, X_test[-2:]))
+print(reference_points := X_test[-2:])
+print(similarity_test := model_explainer.data_similarity(X_test, reference_points))
+print(similarity_train := model_explainer.data_similarity(X, reference_points))
 similarity = np.concatenate([similarity_train,similarity_test])
 
 # DATA SIMILARITY
@@ -88,7 +93,11 @@ plt.title('Data similarity')
 plt.show()
 ```
 
-We can now compute the data similarity score. This is answering the question: Which points in X_test and X are similar to the last two points of X_test?
+#### Data extrapolation
+
+Computing the data extrapolation score answers the question: Which points in the sample are far away from our decision bounds?
+
+It answers this question by computing the distance each sample point has to the decision bounds it encounters (only when it is not between two decision bounds).
 ```python
 
 print(data_extrapolation_test := model_explainer.data_extrapolation(X_test, strategy='naive'))
@@ -103,7 +112,7 @@ plt.title('Data extrapolation')
 plt.show()
 ```
 
-We can now compute the data similarity score. This is answering the question: Which points in X_test and X are similar to the last two points of X_test?
+Another strategy to answer this question is to include the training data which end in the point as well.
 ```python
 print(data_extrapolation_w_train_test := model_explainer.data_extrapolation(X_test, train_X=X, strategy='include_training_data'))
 print(data_extrapolation_w_train_train := model_explainer.data_extrapolation(X, train_X=X, strategy='include_training_data'))
@@ -117,7 +126,11 @@ plt.title('Data extrapolation with train data')
 plt.show()
 ```
 
-We can now compute the data similarity score. This is answering the question: Which points in X_test and X are similar to the last two points of X_test?
+#### Data observations
+
+Compute the data observations score answers the question: Which points predict from bins trained with many data points?
+
+It answers this question by reporting on how many training samples were used on the leaves. This is stored in each decision tree, so we don't require to know the training data to determine this number. The sample provided in the function informs us thus of this value for each point, and doesn't use the other points in this sample to achieve this result. 
 ```python
 print(data_train_observations_test := model_explainer.data_train_observations(X_test, strategy='seen'))
 print(data_train_observations_train := model_explainer.data_train_observations(X, strategy='seen'))
@@ -131,7 +144,8 @@ plt.title('Observations used during train')
 plt.show()
 ```
 
-We can now compute the data similarity score. This is answering the question: Which points in X_test and X are similar to the last two points of X_test?
+Another way to determine this is by looking at the amount of data provided to the algorithm instead of the number that was actually used.
+
 ```python
 print(data_train_observations_weighted_test := model_explainer.data_train_observations(X_test, strategy='weighted'))
 print(data_train_observations_weighted_train := model_explainer.data_train_observations(X, strategy='weighted'))
